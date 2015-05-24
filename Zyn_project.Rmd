@@ -1,0 +1,83 @@
+---
+title: "Practical machine learning project"
+author: "V. Zarnitsyn"
+date: "Saturday, May 23, 2015"
+output: html_document
+---
+
+###Summary: 
+Using training set the prediction algorithm was developed. After several trial and errors with rather complicated algorithms the simple solution for the project was found based on method "rpack" in package "caret". Predictive tree based on timestamp variables only was able to predict classe variable with ~98% accuracy. This estimate for accuracy was received in the process of cross-validation.
+
+###Introduction:
+Using wearable devices devices it is now possible to collect a large amount of data about personal activity relatively inexpensively. In this project, the original goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+Our goal is slightly different from the goal of original researchers which is to predict the manner in which they did the exercise using ANY available data and not only kinematic data  supplied by accelerometers. 
+
+###Methods:
+
+```{r}
+library(caret)
+library(ggplot2)
+library(rpart)
+setwd("C:/Coursera/Machine learning/Project")
+a<-read.csv('pml-training.csv')
+#b is logical vector to select columns in dataset
+b<-as.logical(a[1,])
+for (i in 1:length(names(a))) 
+{
+    b[i]<-FALSE
+}
+#columns 3 and 4 are timestamp columns
+b[3]<-TRUE
+b[4]<-TRUE
+#column 160 is classe variable 
+b[160]<-TRUE
+z<-a[,b]
+```
+
+I started with only very small part of the training set p=0.05 used for model fitting planning to increase it if the cross validating will show the need for it. As you can see from the results below  there was no need to increase it further as the results were quite good. 
+
+```{r}
+inTrain <- createDataPartition(y=z$classe,
+                               p=0.05, list=FALSE)
+#b[160]=TRUE
+trainT <- z[inTrain,]
+testT <- z[-inTrain,]
+
+modelZyn =train(classe ~ .,method="rpart",data=trainT)
+predictTest=predict(modelZyn,newdata=testT)
+confusionMatrix(testT$classe,predictTest)
+```
+As one may see from confusion matrix - the method is better than 98% accurate. 
+In order to illustrate the method I generated visual representation of the selection tree. As one may see during creation of the dataset all measurements of the same type were conducted in non overlapping chunks - that information allowed me to build a prediction model with high accuracy which is computationally quick as well.  
+
+```{r}
+library(rattle)
+fancyRpartPlot(modelZyn$finalModel)
+```
+
+At the final step the model was applied to the test set and answers were generated in the manner required by the project requirements.
+```{r}
+pred_test<-read.csv('pml-testing.csv')
+predz<-pred_test[,b]
+predictTestz=predict(modelZyn,newdata=predz)
+predictTestz
+
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+
+pml_write_files(predictTestz)
+```
+
+###Conclusion:
+One must understand that the method described in this project is inadequate for the practical use. I made several attempts to generate more adequate prediction algorithm which will not rely on shortcuts and will use kinematic data only. With all kinematic variables transformed to 8 principal components random forest method ("rf") in caret package was ~ 80% accurate based on cross validation. When applied to test set it was able to predict accurately 14 out of 20 answers. This method required too much computer time for me to be able to improve it in limited time available for the project completion. On a bright side though - there is no need to develop this method as something very similar was already developed by original researchers. Their article is available on the website (see reference below).
+
+### Reference:
+Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.
+
+Read more: http://groupware.les.inf.puc-rio.br/work.jsf?p1=10335#ixzz3b16yZURb
